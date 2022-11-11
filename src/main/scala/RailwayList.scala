@@ -1,16 +1,16 @@
 
-object Railway {
+object RailwayList {
 
   sealed trait TwoTrack[F]
 
   case class Success[S](data: S) extends TwoTrack[S]
 
-  case class Failure[S](message: String) extends TwoTrack[S]
+  case class Failure[S](messages: List[String]) extends TwoTrack[S]
 
   def succeed[S](x: S) = Success(x)
 
-  def fail[S](message: String) = Failure[S](message)
-
+  def fail[S](message: String) = Failure[S](List(message))
+  def fail[S](messages: List[String]) = Failure[S](messages)
 
   def bind[A, B](switchFunction: A => TwoTrack[B]): TwoTrack[A] => TwoTrack[B] = {
     { (twoTrackInput: TwoTrack[A]) =>
@@ -45,7 +45,7 @@ object Railway {
   }
 
   def doubleMap[A, B](successFunc: A => B)
-                     (failureFunc: String => String)
+                     (failureFunc: List[String] => List[String])
                      (twoTrackInput: TwoTrack[A]): TwoTrack[B] = twoTrackInput match {
     case Success(s) => succeed(successFunc(s))
     case Failure(f) => fail(failureFunc(f))
@@ -53,12 +53,12 @@ object Railway {
 
   def log[A](twoTrackInput: TwoTrack[A]): TwoTrack[A] = {
     val success = { x: A => println(s"DEBUG. Success so far: $x"); x }
-    val failure = { x: String => println(s"ERROR. $x"); x }
+    val failure = { xs: List[String] => println(s"ERROR. ${ xs.mkString("; ") }"); xs }
     doubleMap(success)(failure)(twoTrackInput)
   }
 
   def plus[A, B](addSuccess: (B, B) => B,
-                 addFailure: (String, String) => String,
+                 addFailure: (List[String], List[String]) => List[String],
                  switch1: A => TwoTrack[B],
                  switch2: A => TwoTrack[B])
                 (x: A): TwoTrack[B] = {
@@ -99,11 +99,11 @@ object Railway {
     }
   }
 
-  sealed case class ComposableSwitch[A, B](v1: A => TwoTrack[B]) {
-    def &&&(v2: A => TwoTrack[B]): A => TwoTrack[B] = {
+  sealed case class ComposableSwitch[A, B](f1: A => TwoTrack[B]) {
+    def &&&(f2: A => TwoTrack[B]): A => TwoTrack[B] = {
       val addSuccess: (B, B) => B = (r1: B, _: B) => r1
-      val addFailure: (String, String) => String = (s1: String, s2: String) => s"$s1; $s2"
-      plus(addSuccess, addFailure, v1, v2)
+      val addFailure: (List[String], List[String]) => List[String] = (s1: List[String], s2: List[String]) => s1 ++ s2
+      plus(addSuccess, addFailure, f1, f2)
     }
   }
 
@@ -158,6 +158,8 @@ object Railway {
   }
 
   def main(args: Array[String]): Unit = {
+
+    Tuple22.apply()
 
     val railway =
       validateRequest
